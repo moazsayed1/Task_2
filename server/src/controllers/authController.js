@@ -5,7 +5,7 @@ import { User } from '../models/User.js';
 
 const registerSchema = Joi.object({
   name: Joi.string().min(2).max(60).required(),
-  email: Joi.string().email().required(),
+  email: Joi.string().email().lowercase().trim().required(),
   password: Joi.string().min(6).required()
 });
 
@@ -25,13 +25,24 @@ export async function register(req, res, next) {
 }
 
 const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string().email().lowercase().trim().required(),
   password: Joi.string().required()
 });
 
-// TODO: implement login function
 export async function login(req, res, next) {
- 
+  try {
+    const { value, error } = loginSchema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+
+    const user = await User.findOne({ email: value.email });
+    if (!user) return res.status(401).json({ message: 'Invalid email or password' });
+
+    const ok = await user.comparePassword(value.password);
+    if (!ok) return res.status(401).json({ message: 'Invalid email or password' });
+
+    const token = signToken(user);
+    res.json({ token, user: publicUser(user) });
+  } catch (err) { next(err); }
 }
 
 export async function me(req, res) {
